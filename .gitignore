@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+*.pkl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Excel output
+ketqua_gia.xlsx
+
+# .env file (KHÔNG đẩy lên GitHub)
+.env
+
+# ChromeDriver (nếu không cần thiết)
+chromedriver-win64/
+
+# Google credentials
+backend/n8n-credential-*.json
+
+# Excel output
+backend/ketqua_gia.xlsx
+ketqua_gia.xlsx
+
+# Virtual environment
+venv/

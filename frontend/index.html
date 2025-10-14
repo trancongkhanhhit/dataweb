@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Bảng Giá Sản Phẩm</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>📦 Danh Sách Sản Phẩm</h1>
+  <button id="updateBtn">🔄 Cập nhật giá</button>
+  <a id="downloadBtn" target="_blank">⬇️ Tải Excel</a>
+
+  <table id="data-table">
+    <thead><tr><th>Model</th><th>Ngày cập nhật</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const API_BASE = "https://dataweb-rox3.onrender.com"; // URL https://dataweb-rox3.onrender.com , http://localhost:10000
+
+    function loadData() {
+      $.getJSON(`${API_BASE}/data`, function(rows) {
+        const tbody = $("#data-table tbody");
+        tbody.empty();
+        rows.forEach(r => tbody.append(`<tr><td>${r.model}</td><td>${r.date || ''}</td></tr>`));
+      });
+    }
+
+    $("#updateBtn").on("click", function() {
+      $.get(`${API_BASE}/update`);
+      alert("Đang cập nhật giá... Hãy chờ vài phút!");
+    });
+
+    $("#downloadBtn").attr("href", `${API_BASE}/download`);
+    loadData();
+  </script>
+</body>
+</html>

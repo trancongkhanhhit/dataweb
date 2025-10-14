@@ -1,0 +1,44 @@
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #f6f9fc;
+  color: #333;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  width: 90%;
+  max-width: 1000px;
+  margin: 40px auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 20px;
+}
+
+.btn {
+  background: #007bff;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.btn:hover { background: #0056b3; }
+
+.progress-bar {
+  width: 100%;
+  background: #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 20px;
+  margin: 10px 0;
+}
+#progress-fill {
+  height: 100%;
+  background: #007bff;
+  width: 0%;
+  transition: width 0.5s;
+}
