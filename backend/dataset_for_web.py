@@ -1,4 +1,10 @@
-import pandas as pd, gspread, datetime, time, os, json
+import os
+import json
+import time
+import datetime
+
+import pandas as pd
+import gspread
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -50,13 +56,28 @@ def run_scraper(progress_callback=None):
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--proxy-server='direct://'")
+    options.add_argument("--proxy-bypass-list=*")
+    options.add_argument("--start-maximized")
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    
+    # User agent
+    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
-    # Local hoặc Render
-    CHROMEDRIVER_PATH = os.environ.get(
-        "CHROMEDRIVER_PATH",
-        "D:\\6.WORKING\\1. DATAWEB\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe"
-    )
-    driver = webdriver.Chrome(service=Service(CHROMEDRIVER_PATH), options=options)
+    # Render dùng chromium có sẵn
+    if os.environ.get("RENDER"):
+        # Không cần chỉ định path, dùng chromium có sẵn
+        driver = webdriver.Chrome(options=options)
+    else:
+        # Local development
+        CHROMEDRIVER_PATH = os.environ.get(
+            "CHROMEDRIVER_PATH",
+            "D:\\6.WORKING\\1. DATAWEB\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe"
+        )
+        driver = webdriver.Chrome(service=Service(CHROMEDRIVER_PATH), options=options)
 
     total = len(df)
     for i, row in df.iterrows():
