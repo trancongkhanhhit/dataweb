@@ -14,7 +14,11 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-WORKDIR /app/backend
+COPY ./backend .
 
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "app:app"]
+# Thiết lập cổng mà ứng dụng sẽ chạy
+EXPOSE 10000
+
+# Lệnh để chạy ứng dụng khi container khởi động
+# Gunicorn sẽ chạy từ bên trong thư mục /app (nơi chứa code của bạn)
+CMD ["gunicorn", "dataweb.wsgi:application", "--bind", "0.0.0.0:10000"]
