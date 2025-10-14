@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: dataweb
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: |
+      cd backend && pip install -r requirements.txt
+      # Cài đặt Chrome và ChromeDriver
+      apt-get update
+      apt-get install -y wget gnupg
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
+      apt-get update
+      apt-get install -y google-chrome-stable
+    startCommand: cd backend && python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: PORT
+        value: 10000
+      - key: RENDER
+        value: "true"
+      - key: GOOGLE_CREDENTIALS
+        sync: false
