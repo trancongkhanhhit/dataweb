@@ -21,7 +21,7 @@ ketqua_gia.xlsx
 chromedriver-win64/
 
 # Google credentials
-backend/n8n-credential-*.json
+backend/n8n-credential-452204-cd6aa6fc1a25.json
 
 # Excel output
 backend/ketqua_gia.xlsx
