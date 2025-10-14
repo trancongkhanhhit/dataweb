@@ -2,38 +2,124 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bảng Giá Sản Phẩm</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <h1>📦 Danh Sách Sản Phẩm</h1>
-  <button id="updateBtn">🔄 Cập nhật giá</button>
-  <a id="downloadBtn" target="_blank">⬇️ Tải Excel</a>
+  <div class="container">
+    <h1>📦 Danh Sách Sản Phẩm</h1>
+    
+    <div class="button-group">
+      <button id="updateBtn" class="btn">🔄 Cập nhật giá</button>
+      <a id="downloadBtn" href="{{ url_for('download_excel') }}" class="btn" target="_blank">⬇️ Tải Excel</a>
+    </div>
 
-  <table id="data-table">
-    <thead><tr><th>Model</th><th>Ngày cập nhật</th></tr></thead>
-    <tbody></tbody>
-  </table>
+    <div class="progress-container" id="progressContainer" style="display:none;">
+      <div class="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+      <p id="progress-text">Đang xử lý...</p>
+    </div>
+
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Giá 1</th>
+          <th>Giá 2</th>
+          <th>Ngày cập nhật</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="4" style="text-align:center;">Đang tải dữ liệu...</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <script>
-    const API_BASE = "https://dataweb-rox3.onrender.com"; // URL https://dataweb-rox3.onrender.com , http://localhost:10000
+    // Tự động detect API base (local hoặc production)
+    const API_BASE = window.location.origin;
+    console.log('API Base:', API_BASE);
 
     function loadData() {
       $.getJSON(`${API_BASE}/data`, function(rows) {
         const tbody = $("#data-table tbody");
         tbody.empty();
-        rows.forEach(r => tbody.append(`<tr><td>${r.model}</td><td>${r.date || ''}</td></tr>`));
+        
+        if (rows.length === 0) {
+          tbody.append('<tr><td colspan="4" style="text-align:center;">Chưa có dữ liệu</td></tr>');
+          return;
+        }
+        
+        rows.forEach(r => {
+          tbody.append(`
+            <tr>
+              <td>${r.model || ''}</td>
+              <td>${r.price1 || ''}</td>
+              <td>${r.price2 || ''}</td>
+              <td>${r.date || ''}</td>
+            </tr>
+          `);
+        });
+      }).fail(function(err) {
+        console.error("Lỗi load data:", err);
+        $("#data-table tbody").html('<tr><td colspan="4" style="text-align:center;color:red;">❌ Lỗi tải dữ liệu!</td></tr>');
       });
     }
 
     $("#updateBtn").on("click", function() {
-      $.get(`${API_BASE}/update`);
-      alert("Đang cập nhật giá... Hãy chờ vài phút!");
+      if (confirm("Bắt đầu cập nhật giá? Quá trình này có thể mất vài phút.")) {
+        $.get(`${API_BASE}/update`, function() {
+          $("#progressContainer").show();
+          $("#updateBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
+          checkProgress();
+        }).fail(function(err) {
+          console.error("Lỗi update:", err);
+          alert("❌ Lỗi khi bắt đầu cập nhật!");
+        });
+      }
     });
 
-    $("#downloadBtn").attr("href", `${API_BASE}/download`);
-    loadData();
+    function checkProgress() {
+      const interval = setInterval(function() {
+        $.getJSON(`${API_BASE}/progress`, function(data) {
+          if (data.percent !== undefined) {
+            $("#progress-fill").css("width", data.percent + "%");
+            $("#progress-text").text(`${data.status} (${data.percent}%)`);
+          } else {
+            $("#progress-text").text(data.status || 'Đang xử lý...');
+          }
+          
+          // Kiểm tra nếu hoàn thành
+          if (data.status && (data.status.includes("Hoàn tất") || data.percent === 100)) {
+            clearInterval(interval);
+            $("#progress-text").text("✅ Hoàn tất! Đang tải lại dữ liệu...");
+            
+            setTimeout(function() {
+              $("#progressContainer").fadeOut();
+              $("#updateBtn").prop("disabled", false).text("🔄 Cập nhật giá");
+              loadData();
+            }, 2000);
+          }
+          
+          // Kiểm tra nếu có lỗi
+          if (data.status && data.status.toLowerCase().includes("error")) {
+            clearInterval(interval);
+            $("#progress-text").text("❌ " + data.status);
+            $("#updateBtn").prop("disabled", false).text("🔄 Cập nhật giá");
+          }
+        }).fail(function() {
+          // Không log lỗi nếu endpoint chưa sẵn sàng
+        });
+      }, 1000);
+    }
+
+    // Load data khi trang load
+    $(document).ready(function() {
+      loadData();
+    });
   </script>
 </body>
 </html>

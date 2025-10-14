@@ -72,12 +72,16 @@ def run_scraper(progress_callback=None):
         # Không cần chỉ định path, dùng chromium có sẵn
         driver = webdriver.Chrome(options=options)
     else:
-        # Local development
-        CHROMEDRIVER_PATH = os.environ.get(
-            "CHROMEDRIVER_PATH",
-            "D:\\6.WORKING\\1. DATAWEB\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe"
-        )
-        driver = webdriver.Chrome(service=Service(CHROMEDRIVER_PATH), options=options)
+        # Local development - Selenium tự tìm ChromeDriver
+        try:
+            driver = webdriver.Chrome(options=options)
+        except Exception as e:
+            print(f"❌ Lỗi khởi tạo Chrome: {e}")
+            print("💡 Hướng dẫn fix:")
+            print("   1. Cài Chrome browser mới nhất")
+            print("   2. Selenium sẽ tự download ChromeDriver phù hợp")
+            print("   Hoặc set biến môi trường: CHROMEDRIVER_PATH")
+            raise
 
     total = len(df)
     for i, row in df.iterrows():
