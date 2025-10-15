@@ -23,8 +23,8 @@ print(f"📁 Files in frontend: {os.listdir(FRONTEND_DIR) if os.path.exists(FRON
 
 # ===== Flask config =====
 app = Flask(__name__, 
-            template_folder=BASE_DIR,  # <-- Sửa ở đây
-            static_folder=BASE_DIR,    # <-- Sửa ở đây
+            template_folder=FRONTEND_DIR,
+            static_folder=FRONTEND_DIR,
             static_url_path='')
 CORS(app)
 
