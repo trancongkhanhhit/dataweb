@@ -38,197 +38,210 @@
           <th>Giá cũ (price-1)</th>
           <th>Tăng / Giảm</th>
           <th>%</th>
-          <th>Giá cập nhật web<br/>(có thể chỉnh)</th>
+          <th>Giá cập nhật web<br>(có thể chỉnh)</th>
+          <th>Giá WooCommerce (price2)</th>
           <th>Ngày</th>
           <th>Chọn</th>
           <th>Hành động</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td colspan="10" style="text-align:center;">Đang tải dữ liệu...</td></tr>
+        <tr><td colspan="11" style="text-align:center;">Đang tải dữ liệu...</td></tr>
       </tbody>
     </table>
   </div>
 
 <script>
-  const API_BASE = window.location.origin;
+const API_BASE = window.location.origin;
 
-  function formatPrice(value) {
-    if (value === null || value === undefined || value === "") return '';
-    let n = parseInt(String(value).replace(/[^\d]/g, '')) || 0;
-    return n.toLocaleString('vi-VN') + ' ₫';
-  }
+function formatPrice(value) {
+  if (value === null || value === undefined || value === "") return '';
+  let n = parseInt(String(value).replace(/[^\d]/g, '')) || 0;
+  return n.toLocaleString('vi-VN') + ' ₫';
+}
 
-  function loadData() {
-    $.getJSON(`${API_BASE}/data`, function(rows) {
-      const tbody = $("#data-table tbody");
-      tbody.empty();
+function formatChangeWithSign(changeValue) {
+  const num = Number(changeValue) || 0;
+  const absFormatted = formatPrice(Math.abs(num));
+  if (num > 0) return `<span class="positive">+${absFormatted}</span>`;
+  if (num < 0) return `<span class="negative">-${absFormatted}</span>`;
+  return `<span>${absFormatted}</span>`;
+}
 
-      if (!rows || rows.length === 0) {
-        tbody.append('<tr><td colspan="10" style="text-align:center;">Chưa có dữ liệu</td></tr>');
-        return;
-      }
+function formatPercentWithSign(percentValue) {
+  const num = parseFloat(percentValue);
+  if (!isFinite(num)) return '';
+  const absVal = Math.abs(num).toFixed(2) + '%';
+  if (num > 0) return `<span class="positive">+${absVal}</span>`;
+  if (num < 0) return `<span class="negative">-${absVal}</span>`;
+  return `<span>${absVal}</span>`;
+}
 
-      rows.forEach(r => {
-        const sku = r.model || '';
-        const name = r.name || r.product || '';
-        const price1 = r.price1 || r['price1'] || '';
-        const price_old = r['price-1'] || r['price-1'] || '';
-        const change = r.change || '';
-        const percent = r.percent_change || r['percent_change'] || '';
-        const update_price = r.update_price || r['update_price'] || '';
-        const date = r.date || '';
+// ======================= LOAD DATA =======================
+function loadData() {
+  $.getJSON(`${API_BASE}/data`, function(rows) {
+    const tbody = $("#data-table tbody");
+    tbody.empty();
 
-        const price1_display = formatPrice(price1);
-        const price_old_display = formatPrice(price_old);
-        const change_display = (change === '' ? '' : formatPrice(change));
-        const percent_display = (percent === '' ? '' : `${percent}%`);
-        const update_price_display = update_price === '' ? '' : (parseInt(String(update_price).replace(/[^\d]/g,'')) || 0);
-
-        tbody.append(`
-          <tr data-sku="${sku}">
-            <td class="sku">${sku}</td>
-            <td>${name}</td>
-            <td class="price1">${price1_display}</td>
-            <td class="price-old">${price_old_display}</td>
-            <td class="change">${change_display}</td>
-            <td class="percent">${percent_display}</td>
-            <td class="update-price-cell">
-              <input type="number" class="update-price-input" value="${update_price_display}" />
-            </td>
-            <td class="date">${date}</td>
-            <td style="text-align:center;"><input type="checkbox" class="select-sku" /></td>
-            <td>
-              <button class="save-row btn small">💾 Lưu</button>
-            </td>
-          </tr>
-        `);
-      });
-
-      // checkbox hành vi
-      $("#selectAll").prop("checked", false);
-    }).fail(function(err) {
-      console.error("❌ Lỗi load data:", err);
-      $("#data-table tbody").html('<tr><td colspan="10" style="text-align:center;color:red;">Lỗi tải dữ liệu!</td></tr>');
-    });
-  }
-
-  // Cào lại giá
-  $("#updateBtn").on("click", function() {
-    if (!confirm("Bắt đầu cào lại giá?")) return;
-    $.get(`${API_BASE}/update`, function() {
-      $("#progressContainer").show();
-      $("#updateBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
-      checkProgress();
-    }).fail(function(err) {
-      alert("❌ Lỗi khi bắt đầu cập nhật!");
-    });
-  });
-
-  function checkProgress() {
-    const interval = setInterval(function() {
-      $.getJSON(`${API_BASE}/progress`, function(data) {
-        if (data.percent !== undefined) {
-          $("#progress-fill").css("width", data.percent + "%");
-          $("#progress-text").text(`${data.status} (${data.percent}%)`);
-        } else {
-          $("#progress-text").text(data.status || 'Đang xử lý...');
-        }
-
-        if (data.status && (data.status.includes("Hoàn tất") || data.percent === 100)) {
-          clearInterval(interval);
-          $("#progress-text").text("✅ Hoàn tất! Đang tải lại dữ liệu...");
-          setTimeout(function() {
-            $("#progressContainer").fadeOut();
-            $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
-            loadData();
-          }, 1500);
-        }
-
-        if (data.status && data.status.toLowerCase().includes("error")) {
-          clearInterval(interval);
-          $("#progress-text").text("❌ " + data.status);
-          $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
-        }
-      });
-    }, 1000);
-  }
-
-  // Chọn tất cả
-  $(document).on("change", "#selectAll", function() {
-    const checked = $(this).is(":checked");
-    $(".select-sku").prop("checked", checked);
-  });
-
-  // Save một hàng
-  $(document).on("click", ".save-row", function() {
-    const tr = $(this).closest("tr");
-    const sku = tr.data("sku");
-    const input = tr.find(".update-price-input");
-    const val = parseInt(input.val() || 0);
-
-    $(this).prop("disabled", true).text("⏳");
-
-    $.ajax({
-      url: `${API_BASE}/save-row`,
-      method: "POST",
-      contentType: "application/json",
-      data: JSON.stringify({ sku: sku, update_price: val })
-    }).done(function(res) {
-      alert("✅ Đã lưu update_price cho SKU: " + sku);
-      loadData();
-    }).fail(function(err) {
-      console.error(err);
-      alert("❌ Lỗi khi lưu");
-    }).always(function() {
-      $(".save-row").prop("disabled", false).text("💾 Lưu");
-    });
-  });
-
-  // Bulk update to WooCommerce using input update_price values
-  $("#updateWCBtn").on("click", function() {
-    const selected = [];
-    const price_map = {};
-
-    $("#data-table tbody tr").each(function() {
-      const tr = $(this);
-      const checkbox = tr.find(".select-sku");
-      if (checkbox.is(":checked")) {
-        const sku = tr.data("sku");
-        const val = parseInt(tr.find(".update-price-input").val() || 0);
-        selected.push(sku);
-        price_map[sku] = val;
-      }
-    });
-
-    if (selected.length === 0) {
-      alert("⚠️ Vui lòng chọn ít nhất 1 sản phẩm!");
+    if (!rows || rows.length === 0) {
+      tbody.append('<tr><td colspan="11" style="text-align:center;">Chưa có dữ liệu</td></tr>');
       return;
     }
-    if (!confirm(`Bạn có chắc muốn cập nhật ${selected.length} sản phẩm lên WooCommerce?`)) return;
 
-    $("#updateWCBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
+    rows.forEach(r => {
+      const sku = r.model || '';
+      const name = r.name || r.product || '';
+      const price1 = parseInt(r.price1 || 0);
+      const price_old = parseInt(r['price-1'] || 0);
+      const change = price1 - price_old;
+      const percent_val = price_old ? ((change / price_old) * 100).toFixed(2) : 0;
 
-    fetch(`${API_BASE}/update-prices`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ selected_skus: selected, price_map: price_map })
-    }).then(res => res.json())
-      .then(result => {
-        console.log("KQ cập nhật:", result);
-        alert("✅ Hoàn tất cập nhật WooCommerce (xem console để biết chi tiết).");
-        loadData();
-      }).catch(err => {
-        console.error(err);
-        alert("❌ Lỗi khi cập nhật WooCommerce.");
-      }).finally(() => {
-        $("#updateWCBtn").prop("disabled", false).text("💰 Cập nhật giá WooCommerce (Chọn)");
-      });
+      const update_price = r.update_price || '';
+      const price2 = r.price2 || '';
+      const date = r.date || '';
+
+      const price1_display = formatPrice(price1);
+      const price_old_display = formatPrice(price_old);
+      const change_display_html = formatChangeWithSign(change);
+      const percent_display_html = formatPercentWithSign(percent_val);
+      const update_price_display = update_price ? parseInt(update_price).toLocaleString('vi-VN') : '';
+      const price2_display = formatPrice(price2);
+
+      tbody.append(`
+        <tr data-sku="${sku}">
+          <td class="sku">${sku}</td>
+          <td>${name}</td>
+          <td class="price1">${price1_display}</td>
+          <td class="price-old">${price_old_display}</td>
+          <td class="change">${change_display_html}</td>
+          <td class="percent">${percent_display_html}</td>
+          <td class="update-price-cell">
+            <input type="text" class="update-price-input" value="${update_price_display}" />
+          </td>
+          <td class="price2">${price2_display}</td>
+          <td class="date">${date}</td>
+          <td style="text-align:center;"><input type="checkbox" class="select-sku" /></td>
+          <td><button class="save-row btn small">💾 Lưu</button></td>
+        </tr>
+      `);
+    });
+
+    $("#selectAll").prop("checked", false);
+  }).fail(function(err) {
+    console.error("❌ Lỗi load data:", err);
+    $("#data-table tbody").html('<tr><td colspan="11" style="text-align:center;color:red;">Lỗi tải dữ liệu!</td></tr>');
   });
+}
 
-  $(document).ready(function() {
+$("#updateBtn").on("click", function() {
+  if (!confirm("Bắt đầu cào lại giá?")) return;
+  $.get(`${API_BASE}/update`, function() {
+    $("#progressContainer").show();
+    $("#updateBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
+    checkProgress();
+  }).fail(() => alert("❌ Lỗi khi bắt đầu cập nhật!"));
+});
+
+function checkProgress() {
+  const interval = setInterval(function() {
+    $.getJSON(`${API_BASE}/progress`, function(data) {
+      if (data.percent !== undefined) {
+        $("#progress-fill").css("width", data.percent + "%");
+        $("#progress-text").text(`${data.status} (${data.percent}%)`);
+      }
+
+      if (data.status && (data.status.includes("Hoàn tất") || data.percent === 100)) {
+        clearInterval(interval);
+        $("#progress-text").text("✅ Hoàn tất! Đang tải lại dữ liệu...");
+        setTimeout(() => {
+          $("#progressContainer").fadeOut();
+          $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
+          loadData();
+        }, 1500);
+      }
+
+      if (data.status && data.status.toLowerCase().includes("error")) {
+        clearInterval(interval);
+        $("#progress-text").text("❌ " + data.status);
+        $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
+      }
+    });
+  }, 1000);
+}
+
+$(document).on("change", "#selectAll", function() {
+  $(".select-sku").prop("checked", $(this).is(":checked"));
+});
+
+// 🧮 Tự động chấm ngăn cách khi nhập
+$(document).on("input", ".update-price-input", function() {
+  let raw = $(this).val().replace(/[^\d]/g, ""); 
+  if (raw === "") {
+    $(this).val("");
+    return;
+  }
+  let formatted = Number(raw).toLocaleString("vi-VN");
+  $(this).val(formatted);
+});
+
+// 💾 Lưu giá trị (chuyển về số thật)
+$(document).on("click", ".save-row", function() {
+  const tr = $(this).closest("tr");
+  const sku = tr.data("sku");
+  const raw_val = tr.find(".update-price-input").val().replace(/[^\d]/g, ""); 
+  const val = parseInt(raw_val || 0);
+  $(this).prop("disabled", true).text("⏳");
+
+  $.ajax({
+    url: `${API_BASE}/save-row`,
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify({ sku, update_price: val })
+  }).done(() => {
+    alert("✅ Đã lưu SKU: " + sku);
     loadData();
+  }).fail(() => alert("❌ Lỗi khi lưu")).always(() => {
+    $(".save-row").prop("disabled", false).text("💾 Lưu");
   });
+});
+
+$("#updateWCBtn").on("click", function() {
+  const selected = [];
+  const price_map = {};
+  $("#data-table tbody tr").each(function() {
+    const checkbox = $(this).find(".select-sku");
+    if (checkbox.is(":checked")) {
+      const sku = $(this).data("sku");
+      const raw_val = $(this).find(".update-price-input").val().replace(/[^\d]/g, "");
+      const val = parseInt(raw_val || 0);
+      selected.push(sku);
+      price_map[sku] = val;
+    }
+  });
+  if (selected.length === 0) return alert("⚠️ Chưa chọn sản phẩm nào!");
+  if (!confirm(`Cập nhật ${selected.length} sản phẩm sang WooCommerce?`)) return;
+
+  $("#updateWCBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
+
+  fetch(`${API_BASE}/update-prices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected_skus: selected, price_map })
+  })
+  .then(res => res.json())
+  .then(result => {
+    console.log("Kết quả cập nhật:", result);
+    alert("✅ Hoàn tất cập nhật WooCommerce!");
+    loadData();
+  })
+  .catch(() => alert("❌ Có lỗi khi cập nhật WooCommerce!"))
+  .finally(() => {
+    $("#updateWCBtn").prop("disabled", false).text("💰 Cập nhật giá WooCommerce (Chọn)");
+  });
+});
+
+$(document).ready(loadData);
 </script>
+
 </body>
 </html>

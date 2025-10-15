@@ -95,3 +95,5 @@ h1 { margin: 0 0 12px 0; font-size: 20px; }
   #data-table thead th:nth-child(2),
   #data-table tbody td:nth-child(2) { display:none; } /* ẩn tên nếu cần */
 }
+.positive { color: #0f9d58; font-weight: 600; }
+.negative { color: #d93025; font-weight: 600; }
