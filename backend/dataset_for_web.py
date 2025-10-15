@@ -2,103 +2,109 @@ import os
 import json
 import time
 import datetime
-
+import requests
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from requests.auth import HTTPBasicAuth
 
+# ===== Config =====
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1UZ-wwMFWwQYwOUh91_h4U6tUQLl5zjgpPlWov9B21yg/edit"
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
-          "https://www.googleapis.com/auth/drive"]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
-# Đường dẫn file Excel tuyệt đối
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_FILE = os.path.join(BASE_DIR, "ketqua_gia.xlsx")
 
+# ====== Google Sheets client ======
 def get_google_client():
     if os.environ.get("GOOGLE_CREDENTIALS"):
         creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     else:
-        creds = Credentials.from_service_account_file(
-            os.path.join(BASE_DIR, "n8n-credential-452204-cd6aa6fc1a25.json"),
-            scopes=SCOPES
-        )
-    client = gspread.authorize(creds)
-    return client
+        raise RuntimeError("Thiếu GOOGLE_CREDENTIALS trong .env")
+    return gspread.authorize(creds)
 
-def get_price(driver, url):
+# ====== Lấy giá WooCommerce theo SKU ======
+def get_woocommerce_price(sku):
+    wc_api_url = os.environ.get("WC_API_URL")
+    wc_key = os.environ.get("WC_CONSUMER_KEY")
+    wc_secret = os.environ.get("WC_CONSUMER_SECRET")
+
+    if not sku:
+        return "Không có SKU"
+
     try:
-        if not url: return "Không có URL"
-        driver.get(url)
-        time.sleep(2)
-        if "ketnoitieudung.vn" in url:
-            els = driver.find_elements(By.CSS_SELECTOR, "span.product-card__main-price")
-            if els: return els[-1].text.strip()
-        elif "3rtech.vn" in url:
-            els = driver.find_elements(By.CSS_SELECTOR, "span.woocommerce-Price-amount.amount bdi")
-            if els: return els[0].text.strip() + " ₫"
-        return "Không tìm thấy giá"
+        res = requests.get(
+            f"{wc_api_url}/products",
+            params={"sku": sku},
+            auth=HTTPBasicAuth(wc_key, wc_secret),
+        )
+        if res.status_code != 200:
+            return "Lỗi API"
+        data = res.json()
+        if not data:
+            return "Không tìm thấy"
+        product = data[0]
+        return product.get("regular_price", "0")
     except Exception as e:
         return f"Lỗi: {e}"
 
+# ====== Cào giá từ website đối thủ ======
+def get_price(driver, url):
+    try:
+        if not url:
+            return "Không có URL"
+
+        driver.get(url)
+        time.sleep(2)
+
+        if "ketnoitieudung.vn" in url:
+            els = driver.find_elements(By.CSS_SELECTOR, "span.product-card__main-price")
+            if els:
+                return els[-1].text.strip()
+
+        elif "boschvn.com" in url:
+            els = driver.find_elements(By.CSS_SELECTOR, "span.woocommerce-Price-amount.amount bdi")
+            if els:
+                text = els[0].text.strip().replace("\xa0", "").replace("₫", "").strip()
+                return text + " ₫"
+
+        return "Không tìm thấy giá"
+
+    except Exception as e:
+        return f"Lỗi: {e}"
+
+# ====== Chạy toàn bộ cào giá + lấy giá Woo ======
 def run_scraper(progress_callback=None):
     client = get_google_client()
     ws = client.open_by_url(SHEET_URL).get_worksheet(0)
     df = pd.DataFrame(ws.get_all_records())
 
-    # Setup Chrome
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--proxy-server='direct://'")
-    options.add_argument("--proxy-bypass-list=*")
-    options.add_argument("--start-maximized")
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    
-    # User agent
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-
-    # Render dùng chromium có sẵn
-    if os.environ.get("RENDER"):
-        # Không cần chỉ định path, dùng chromium có sẵn
-        driver = webdriver.Chrome(options=options)
-    else:
-        # Local development - Selenium tự tìm ChromeDriver
-        try:
-            driver = webdriver.Chrome(options=options)
-        except Exception as e:
-            print(f"❌ Lỗi khởi tạo Chrome: {e}")
-            print("💡 Hướng dẫn fix:")
-            print("   1. Cài Chrome browser mới nhất")
-            print("   2. Selenium sẽ tự download ChromeDriver phù hợp")
-            print("   Hoặc set biến môi trường: CHROMEDRIVER_PATH")
-            raise
+    driver = webdriver.Chrome(options=options)
 
     total = len(df)
     for i, row in df.iterrows():
         model = row.get("model")
-        url1, url2 = row.get("url1"), row.get("url2")
+        url1 = row.get("url1")
+
         print(f"🔍 ({i+1}/{total}) {model}")
 
         df.at[i, "price1"] = get_price(driver, url1)
-        time.sleep(1)
-        df.at[i, "price2"] = get_price(driver, url2)
+        df.at[i, "price2"] = get_woocommerce_price(model)
         df.at[i, "date"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if progress_callback:
-            progress_callback(i+1, total)
+            progress_callback(i + 1, total)
+
+    driver.quit()
 
     ws.update([df.columns.values.tolist()] + df.values.tolist())
-
     df.to_excel(EXCEL_FILE, index=False)
-    driver.quit()
     print(f"✅ Hoàn tất. File Excel tại: {EXCEL_FILE}")

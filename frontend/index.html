@@ -12,7 +12,8 @@
     <h1>📦 Danh Sách Sản Phẩm</h1>
     
     <div class="button-group">
-      <button id="updateBtn" class="btn">🔄 Cập nhật giá</button>
+      <button id="updateBtn" class="btn">🔄 Cào lại giá</button>
+      <button id="updateWCBtn" class="btn">💰 Cập nhật giá WooCommerce</button>
       <a id="downloadBtn" href="{{ url_for('download_excel') }}" class="btn" target="_blank">⬇️ Tải Excel</a>
     </div>
 
@@ -26,62 +27,83 @@
     <table id="data-table">
       <thead>
         <tr>
-          <th>Model</th>
-          <th>Giá 1</th>
-          <th>Giá 2</th>
+          <th>Chọn</th>
+          <th>Mã sản phẩm (SKU)</th>
+          <th>Tên / Model</th>
+          <th>Giá 1 (price1)</th>
+          <th>Giá 2 (price2)</th>
           <th>Ngày cập nhật</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td colspan="4" style="text-align:center;">Đang tải dữ liệu...</td></tr>
+        <tr><td colspan="6" style="text-align:center;">Đang tải dữ liệu...</td></tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    // Tự động detect API base (local hoặc production)
     const API_BASE = window.location.origin;
     console.log('API Base:', API_BASE);
 
+    // --- Hàm định dạng giá: thêm phân cách và ký hiệu ₫ ---
+    function formatPrice(value) {
+      if (!value) return '';
+      // loại bỏ ký tự không cần thiết
+      let clean = value.toString().replace(/[^\d]/g, '');
+      if (!clean) return '';
+      return parseInt(clean).toLocaleString('vi-VN') + ' ₫';
+    }
+
+    // --- Load dữ liệu Google Sheet ---
     function loadData() {
       $.getJSON(`${API_BASE}/data`, function(rows) {
         const tbody = $("#data-table tbody");
         tbody.empty();
-        
+
         if (rows.length === 0) {
-          tbody.append('<tr><td colspan="4" style="text-align:center;">Chưa có dữ liệu</td></tr>');
+          tbody.append('<tr><td colspan="6" style="text-align:center;">Chưa có dữ liệu</td></tr>');
           return;
         }
-        
+
         rows.forEach(r => {
+          const sku = r.model || '';
+          const price1 = r.price1 || '';
+          const price2 = r.price2 || '';
+          const date = r.date || '';
+          const name = r.name || r.product || '';
+
           tbody.append(`
-            <tr>
-              <td>${r.model || ''}</td>
-              <td>${r.price1 || ''}</td>
-              <td>${r.price2 || ''}</td>
-              <td>${r.date || ''}</td>
+            <tr data-sku="${sku}" data-price="${price1}">
+              <td><input type="checkbox" class="select-sku"></td>
+              <td>${sku}</td>
+              <td>${name}</td>
+              <td>${formatPrice(price1)}</td>
+              <td>${formatPrice(price2)}</td>
+              <td>${date}</td>
             </tr>
           `);
         });
       }).fail(function(err) {
-        console.error("Lỗi load data:", err);
-        $("#data-table tbody").html('<tr><td colspan="4" style="text-align:center;color:red;">❌ Lỗi tải dữ liệu!</td></tr>');
+        console.error("❌ Lỗi load data:", err);
+        $("#data-table tbody").html('<tr><td colspan="6" style="text-align:center;color:red;">Lỗi tải dữ liệu!</td></tr>');
       });
     }
 
+    // --- Cào lại giá ---
     $("#updateBtn").on("click", function() {
-      if (confirm("Bắt đầu cập nhật giá? Quá trình này có thể mất vài phút.")) {
+      if (confirm("Bắt đầu cào lại giá? Quá trình này có thể mất vài phút.")) {
         $.get(`${API_BASE}/update`, function() {
           $("#progressContainer").show();
           $("#updateBtn").prop("disabled", true).text("⏳ Đang cập nhật...");
           checkProgress();
         }).fail(function(err) {
-          console.error("Lỗi update:", err);
+          console.error("❌ Lỗi update:", err);
           alert("❌ Lỗi khi bắt đầu cập nhật!");
         });
       }
     });
 
+    // --- Theo dõi tiến trình cào giá ---
     function checkProgress() {
       const interval = setInterval(function() {
         $.getJSON(`${API_BASE}/progress`, function(data) {
@@ -91,32 +113,71 @@
           } else {
             $("#progress-text").text(data.status || 'Đang xử lý...');
           }
-          
-          // Kiểm tra nếu hoàn thành
+
           if (data.status && (data.status.includes("Hoàn tất") || data.percent === 100)) {
             clearInterval(interval);
             $("#progress-text").text("✅ Hoàn tất! Đang tải lại dữ liệu...");
-            
             setTimeout(function() {
               $("#progressContainer").fadeOut();
-              $("#updateBtn").prop("disabled", false).text("🔄 Cập nhật giá");
+              $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
               loadData();
             }, 2000);
           }
-          
-          // Kiểm tra nếu có lỗi
+
           if (data.status && data.status.toLowerCase().includes("error")) {
             clearInterval(interval);
             $("#progress-text").text("❌ " + data.status);
-            $("#updateBtn").prop("disabled", false).text("🔄 Cập nhật giá");
+            $("#updateBtn").prop("disabled", false).text("🔄 Cào lại giá");
           }
-        }).fail(function() {
-          // Không log lỗi nếu endpoint chưa sẵn sàng
         });
       }, 1000);
     }
 
-    // Load data khi trang load
+    // --- Cập nhật giá WooCommerce ---
+    $("#updateWCBtn").on("click", function() {
+      const selectedSkus = [];
+      const priceMap = {};
+
+      $("#data-table tbody tr").each(function() {
+        const checkbox = $(this).find(".select-sku");
+        if (checkbox.is(":checked")) {
+          const sku = $(this).data("sku");
+          const priceText = $(this).data("price").toString().replace(/[^\d]/g, '');
+          const price = parseInt(priceText);
+          selectedSkus.push(sku);
+          priceMap[sku] = price;
+        }
+      });
+
+      if (selectedSkus.length === 0) {
+        alert("⚠️ Vui lòng chọn ít nhất 1 sản phẩm để cập nhật giá!");
+        return;
+      }
+
+      if (!confirm(`Bạn có chắc muốn cập nhật ${selectedSkus.length} sản phẩm sang WooCommerce?`)) return;
+
+      $("#updateWCBtn").prop("disabled", true).text("⏳ Đang cập nhật WooCommerce...");
+
+      fetch(`${API_BASE}/update-prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selected_skus: selectedSkus, price_map: priceMap })
+      })
+      .then(res => res.json())
+      .then(result => {
+        console.log("Kết quả cập nhật:", result);
+        alert("✅ Đã cập nhật giá WooCommerce!");
+      })
+      .catch(err => {
+        console.error("❌ Lỗi khi cập nhật WooCommerce:", err);
+        alert("❌ Có lỗi khi cập nhật WooCommerce!");
+      })
+      .finally(() => {
+        $("#updateWCBtn").prop("disabled", false).text("💰 Cập nhật giá WooCommerce");
+      });
+    });
+
+    // --- Khi tải trang ---
     $(document).ready(function() {
       loadData();
     });
