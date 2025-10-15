@@ -157,4 +157,4 @@ def run_scraper(progress_callback=None):
     # ghi lại sheet (ghi toàn bộ bảng)
     ws.update([df.columns.values.tolist()] + df.values.tolist())
     df.to_excel(EXCEL_FILE, index=False)
-    print(f"✅ Hoàn tất. File Excel tại: {EXCEL_FILE}")
+    print(f"✅ Hoàn tất. File Excel tại: {EXCEL_FILE}") #
