@@ -36,8 +36,8 @@ def update_price_by_sku(sku, new_price):
 
         # 2️⃣ Gửi lệnh cập nhật giá
         payload = {
-            "regular_price": str(new_price),
-            "price": str(new_price)
+            "regular_price": str(int(new_price)),
+            "price": str(int(new_price))
         }
 
         update_res = requests.put(
@@ -46,7 +46,7 @@ def update_price_by_sku(sku, new_price):
             json=payload
         )
 
-        if update_res.status_code == 200:
+        if update_res.status_code in (200, 201):
             print(f"[✅] SKU {sku} cập nhật thành công → {new_price}đ")
             return True
         else:
